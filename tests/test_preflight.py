@@ -4,9 +4,13 @@ GH #216 (v4.9.1): retry + timeout + atomic-rename behavior.
 """
 
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
+import chromadb
 import pytest
+
+from mcp_server import preflight
 
 
 def test_probe_uses_absolute_parent_base_even_with_relative_environment(tmp_path, monkeypatch):
@@ -253,3 +257,20 @@ def test_chroma_rename_failure_rolls_back_metadata(tmp_path, monkeypatch):
     assert chroma_dir.exists(), "chroma_db moved despite the OSError on its rename"
     # Rename call sequence: metadata-forward, chroma_db-forward (raises), metadata-rollback.
     assert call_count["n"] == 3
+
+
+def test_probe_on_fresh_install_is_read_only(tmp_path, monkeypatch):
+    """The probe must not create the collection on a fresh install.
+
+    Creating it here bound the collection to Chroma's default embedding
+    function, so the server later failed with an embedding function conflict.
+    """
+    monkeypatch.setattr(preflight, "BASE_DIR", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(Path(preflight.__file__).resolve().parent.parent))
+
+    result = preflight._probe_chroma()
+
+    assert result.returncode == 0, result.stderr
+
+    client = chromadb.PersistentClient(path=str(tmp_path / "data" / "chroma_db"))
+    assert client.list_collections() == []

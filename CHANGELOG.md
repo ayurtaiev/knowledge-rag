@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Fixed:**
 
 - `search_knowledge(category)`, `list_documents(category)` and `add_from_url(title)` now accept an explicit `null`. They were annotated `str = None`, so the tool schema advertised `"default": null` on a string-only field and the MCP SDK rejected `{"category": null}` with a validation error before the tool ran. They are now `Optional[str]`, matching the other optional arguments.
+- Preflight Chroma probe is now read-only. It used `get_or_create_collection` without an `embedding_function`, so on a fresh install it created the collection with Chroma's default embedder and the server then reopened it with `FastEmbedEmbeddings`, producing an `Embedding function conflict`. The probe now uses `get_collection` (a missing collection is treated as healthy, not as a failure) and no longer imports `mcp_server.server`, which also avoids the extra cold-start time. The collection is created only by the server, with the correct embedder.
 
 ---
 

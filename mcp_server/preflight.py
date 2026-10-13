@@ -162,16 +162,19 @@ def _probe_chroma(
     """Check Chroma in a child process so native crashes do not kill MCP startup."""
     code = r"""
 import chromadb
+from chromadb.errors import NotFoundError
 
 from mcp_server.config import config
-from mcp_server.server import FastEmbedEmbeddings
 
 if not config.chroma_dir.exists():
     print("missing")
     raise SystemExit(0)
 
 client = chromadb.PersistentClient(path=str(config.chroma_dir))
-collection = client.get_or_create_collection(name=config.collection_name, embedding_function=FastEmbedEmbeddings())
+try:
+    collection = client.get_collection(name=config.collection_name)
+except NotFoundError:
+    raise SystemExit(0)
 print(collection.count())
 """
     env = os.environ.copy()
